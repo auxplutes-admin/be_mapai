@@ -142,7 +142,7 @@ app.post('/chat', async (req, res) => {
   });
 
   const ragContext =
-    `You are an expert on regional geology. Prefer the snippets; if empty, use your own knowledge.\n\n` +
+    `You are an expert on regional geology, region: ${regionId}, democratic republic of the congo. Prefer the snippets; if empty, use your own knowledge.\n\n` +
     `CONTEXT:\n${snippets.join('\n---\n')}`;
 
   const messages = [
