@@ -1,9 +1,13 @@
 require('dotenv').config();
 const express = require('express');
+const helmet = require("helmet");
+const cors = require('cors');
+
 require('dotenv').config();
 const axios = require('axios');
 const { Pinecone } = require('@pinecone-database/pinecone');
 const OpenAI = require('openai');
+const corsOptions = require('./config/corsoptions')
 
 
 const pinecone = new Pinecone({
@@ -16,6 +20,13 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const app = express();
 app.use(express.json());
+app.use(helmet())
+
+
+
+app.use(cors(corsOptions));
+app.use(express.urlencoded({ extended: true }));
+//app.use(session);
 
 // app.post('/chat', async (req, res) => {
 //   try {
