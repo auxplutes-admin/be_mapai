@@ -26,164 +26,206 @@ app.use(helmet())
 
 app.use(cors(corsOptions));
 app.use(express.urlencoded({ extended: true }));
-//app.use(session);
+
 
 // app.post('/chat', async (req, res) => {
-//   try {
-//     const { regionId, question, session_id } = req.body;
-//     if (!regionId || !question) {
-//       return res.status(400).json({ error: 'regionId and question are required' });
-//     }
+//   const { regionId, question, session_id } = req.body;
 
-//     // 3) Embed the question
-//     const embResp = await openai.embeddings.create({
-//       model: 'text-embedding-ada-002',
-//       input: question,
-//     });
-//     const qEmb = embResp.data[0].embedding;
+//   // start history immediately
+//   const historyPromise = axios.post(
+//     'https://x3kb-thkl-gi2q.n7e.xano.io/api:hWPNd5f8/get_history',
+//     { session_id, message: question },
+//     { headers: { 'Content-Type': 'application/json' } }
+//   );
 
-//     // // 4) Pinecone similarity query with metadata filter
-//     const pineResp = await index.query({
-//       vector: qEmb,
-//       topK: 5,
-//       includeMetadata: true,
-//       filter: { regionId },
-//     });
+//   // start embedding
+//   const embResp = await openai.embeddings.create({
+//     model: 'text-embedding-3-small',
+//     input: question,
+//   });
+//   const qEmb = embResp.data[0].embedding;
 
-//     // 5) Build snippets
-//     const snippets = pineResp.matches.length
-//       ? pineResp.matches.map(m => {
-//         const { sourcePdf, chunkIndex, text = '<no text>' } = m.metadata;
-//         return `(${sourcePdf}, chunk #${chunkIndex}):\n${text}`;
-//       })
-//       : [];
+//   // start pinecone query as soon as we have the embedding
+//   const pinePromise = index.query({
+//     vector: qEmb,
+//     topK: 3, // lower = faster serialization + faster LLM context
+//     includeMetadata: true,
+//     filter: { regionId },
+//   });
 
-//     // 6) Retrieve chat history
-//     // const snippets = []
-//     const historyRes = await axios.post(
-//       'https://x3kb-thkl-gi2q.n7e.xano.io/api:hWPNd5f8/get_history',
-//       { session_id, message: question },
-//       { headers: { 'Content-Type': 'application/json' } }
-//     );
-//     const history = historyRes.data.history;
+//   const [historyRes, pineResp] = await Promise.all([historyPromise, pinePromise]);
+//   const history = historyRes.data.history;
+//   const snippets = (pineResp.matches || []).map(m => {
+//     const { sourcePdf, chunkIndex, text = '<no text>' } = m.metadata || {};
+//     return `(${sourcePdf}, chunk #${chunkIndex}):\n${text}`;
+//   });
 
-//     // 7) Construct RAG context
-//     const ragContext =
-//       `You are an expert on regional geology. Answer using the following context snippets: as increased knowledge, But if context is empty, use your own knowledge\n\n` +
-//       `CONTEXT:\n${snippets.join('\n---\n')}`;
+//   const ragContext =
+//     `You are an expert on regional geology, region: ${regionId}, democratic republic of the congo. Prefer the snippets; if empty, use your own knowledge.\n\n` +
+//     `CONTEXT:\n${snippets.join('\n---\n')}`;
 
-//     const messages = [
-//       { role: 'system', content: ragContext },
-//       ...history
-//     ];
+//   const messages = [
+//     { role: 'developer', content: ragContext },
+//     // optional: only last 8-12 turns to keep tokens low
+//     ...history.slice(-12),
+//   ];
 
-//     // 8) Call GPT-4
-//     const chatResp = await openai.chat.completions.create({
-//       model: 'gpt-4',
-//       messages,
-//       temperature: 0,
-//     });
-
-//     const assistantReply = chatResp.choices[0].message.content.trim();
-
-
-//     await axios.post(
-//       "https://x3kb-thkl-gi2q.n7e.xano.io/api:hWPNd5f8/llm_responses_save",
-//       {
-//         prompt: question,
-//         session_id: session_id,
-//         response: assistantReply,
-//         metadata: {
-//           inputPrompts: [question],
-//           result: assistantReply
-//         },
-//         regionId: regionId
-//       },
-//       {
-//         headers: {
-//           "Content-Type": "application/json"
-//         }
-//       }
-//     );
-
-//     // const newHistory = [
-//     //   ...history,
-//     //   { role: 'user', content: question },
-//     //   { role: 'assistant', content: assistantReply },
-//     // ];
-
-//     res.json({ answer: assistantReply});
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ error: 'Internal server error' });
-//   }
+// const chatResp = await openai.responses.create({
+//   model: 'gpt-4.1-nano-2025-04-14',
+//   input: messages
 // });
 
+// const assistantReply = chatResp.output_text;
+
+// //console.log('chatresp:', chatResp);
+
+
+//   // respond to the user ASAP
+//   res.json({ answer: assistantReply });
+
+//   // do the logging/save OUTSIDE the response path (don’t await)
+//   axios.post("https://x3kb-thkl-gi2q.n7e.xano.io/api:hWPNd5f8/llm_responses_save", {
+//     prompt: question,
+//     session_id,
+//     response: assistantReply,
+//     metadata: { inputPrompts: [question], result: assistantReply },
+//     regionId
+//   }, { headers: { "Content-Type": "application/json" } })
+//   .catch(err => console.error('save failed', err));
+// });
 
 app.post('/chat', async (req, res) => {
   const { regionId, question, session_id } = req.body;
 
-  // start history immediately
+  // kick off history save immediately
   const historyPromise = axios.post(
     'https://x3kb-thkl-gi2q.n7e.xano.io/api:hWPNd5f8/get_history',
     { session_id, message: question },
     { headers: { 'Content-Type': 'application/json' } }
   );
 
-  // start embedding
+  // embedding
   const embResp = await openai.embeddings.create({
     model: 'text-embedding-3-small',
     input: question,
   });
   const qEmb = embResp.data[0].embedding;
 
-  // start pinecone query as soon as we have the embedding
-  const pinePromise = index.query({
+  // pinecone: region-specific and generic, in parallel
+  const pineRegionPromise = index.query({
     vector: qEmb,
-    topK: 3, // lower = faster serialization + faster LLM context
+    topK: 5,
     includeMetadata: true,
-    filter: { regionId },
+    filter: { regionId }, // e.g., "katanga", "kivu", etc.
   });
 
-  const [historyRes, pineResp] = await Promise.all([historyPromise, pinePromise]);
-  const history = historyRes.data.history;
-  const snippets = (pineResp.matches || []).map(m => {
-    const { sourcePdf, chunkIndex, text = '<no text>' } = m.metadata || {};
-    return `(${sourcePdf}, chunk #${chunkIndex}):\n${text}`;
+  // NOTE: you wrote 'genric'—use the canonical 'generic'
+  const pineGenericPromise = index.query({
+    vector: qEmb,
+    topK: 10,
+    includeMetadata: true,
+    filter: { regionId: 'generic' },
   });
 
-  const ragContext =
-    `You are an expert on regional geology, region: ${regionId}, democratic republic of the congo. Prefer the snippets; if empty, use your own knowledge.\n\n` +
-    `CONTEXT:\n${snippets.join('\n---\n')}`;
+  const [historyRes, pineRegionResp, pineGenericResp] =
+    await Promise.all([historyPromise, pineRegionPromise, pineGenericPromise]);
+
+  const history = historyRes.data.history || [];
+
+  // prepare snippets
+  const toSnippet = (m) => {
+    const md = m?.metadata || {};
+    const {
+      sourcePdf = '<unknown source>',
+      chunkIndex = '?',
+      text = '<no text>',
+      regionId: mdRegionId = 'unknown'
+    } = md;
+    return {
+      sourcePdf: `${sourcePdf}`,
+      id: `${mdRegionId}:${sourcePdf}`,
+      score: m?.score ?? 0,
+      regionId: mdRegionId,
+      pretty: `(${mdRegionId} | ${sourcePdf}, chunk #${chunkIndex}):\n${text}`
+    };
+  };
+
+  let regionSnips = (pineRegionResp.matches || []).map(toSnippet);
+  let genericSnips = (pineGenericResp.matches || []).map(toSnippet);
+
+  const mentionsGeologist = /\bgeologist(s)?\b/i.test(question);
+
+  // If user mentions "geologist", nudge generic snippets up a bit so they float higher.
+  if (mentionsGeologist) {
+    genericSnips = genericSnips.map(s => ({ ...s, score: s.score + 0.05 }));
+  }
+
+  // merge, dedupe by id, then sort by score desc; always include some of each
+  const merged = [...regionSnips, ...genericSnips]
+    .reduce((acc, s) => (acc.has(s.id) ? acc : acc.add(s.id) && acc), new Set(),)
+    && [...regionSnips, ...genericSnips]; // Set trick above just for uniqueness
+  const unique = Array.from(
+    new Map([...regionSnips, ...genericSnips].map(s => [s.id, s])).values()
+  ).sort((a, b) => (b.score - a.score));
+
+  // keep a small, fast context
+  const topSnips = unique.slice(0, 15);
+  const contextEmpty = topSnips.length === 0;
+
+  const contextBlock = topSnips.map(s => s.pretty).join('\n---\n');
+
+  // Build a STRICT RAG developer message
+  const devDirectives = [
+    `You are an expert on regional geology in the Democratic Republic of the Congo. Region focus: ${regionId}.`,
+    `Use the provided CONTEXT snippets as the **primary** source of truth.`,
+    `Prefer the CONTEXT; if it does not contain relevant facts to answer, rely on your own knowledge to answer directly.`,
+    `Be precise and avoid speculation. If you are uncertain, state the uncertainty briefly.`,
+    `If the user text mentions "geologist", prefer the 'generic' snippets and explicitly attribute relevant statements as: "The geologist said …".`,
+    `Cite which snippet you used inline like ([sourcePdf]) when the answer draws from CONTEXT.`
+  ].join('\n');
+
+  const ragContext = `${devDirectives}\n\nCONTEXT:\n${contextBlock || '<no context>'}`;
 
   const messages = [
-    { role: 'system', content: ragContext },
-    // optional: only last 8-12 turns to keep tokens low
+    { role: 'developer', content: ragContext },
     ...history.slice(-12),
+    { role: 'user', content: question }
   ];
 
-  const chatResp = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages,
-    temperature: 0,
-    max_tokens: 400,
+
+  const chatResp = await openai.responses.create({
+    model: 'gpt-4.1-nano-2025-04-14',
+    input: messages
   });
 
-  const assistantReply = chatResp.choices[0].message.content.trim();
+  const assistantReply = chatResp.output_text;
 
-  // respond to the user ASAP
+  // respond ASAP
   res.json({ answer: assistantReply });
 
-  // do the logging/save OUTSIDE the response path (don’t await)
-  axios.post("https://x3kb-thkl-gi2q.n7e.xano.io/api:hWPNd5f8/llm_responses_save", {
-    prompt: question,
-    session_id,
-    response: assistantReply,
-    metadata: { inputPrompts: [question], result: assistantReply },
-    regionId
-  }, { headers: { "Content-Type": "application/json" } })
-  .catch(err => console.error('save failed', err));
+  // async logging (no await)
+  axios.post(
+    "https://x3kb-thkl-gi2q.n7e.xano.io/api:hWPNd5f8/llm_responses_save",
+    {
+      prompt: question,
+      session_id,
+      response: assistantReply,
+      metadata: {
+        inputPrompts: [question],
+        result: assistantReply,
+        regionId,
+        mentionsGeologist,
+        usedContext: !contextEmpty,
+        snippetCount: topSnips.length
+      },
+      regionId
+    },
+    { headers: { "Content-Type": "application/json" } }
+  ).catch(err => console.error('save failed', err));
 });
+
+
+// Optional: Add a separate endpoint to check system status
 
 const port = process.env.PORT || 3055;
 app.listen(port, () => {
