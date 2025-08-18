@@ -181,7 +181,6 @@ app.post('/chat', async (req, res) => {
     `Prefer the CONTEXT; if it does not contain relevant facts to answer, rely on your own knowledge to answer directly.`,
     `Be precise and avoid speculation. If you are uncertain, state the uncertainty briefly.`,
     `If the user text mentions "geologist", prefer the 'generic' snippets and explicitly attribute relevant statements as: "The geologist said …".`,
-    `Cite which snippet you used inline like ([sourcePdf]) when the answer draws from CONTEXT.`
   ].join('\n');
 
   const ragContext = `${devDirectives}\n\nCONTEXT:\n${contextBlock || '<no context>'}`;
