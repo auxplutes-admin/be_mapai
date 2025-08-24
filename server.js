@@ -226,7 +226,7 @@ app.post('/chat_sa', async (req, res) => {
 
 // Optional: Add a separate endpoint to check system status
 
-const port = process.env.PORT || 3055;
+const port = process.env.PORT || 3061;
 app.listen(port, () => {
   console.log(`Server listening on http://localhost:${port}`);
 });
