@@ -13,7 +13,7 @@ const corsOptions = require('./config/corsoptions')
 const pinecone = new Pinecone({
   apiKey: process.env.PINECONE_API_KEY
 });
-const index = pinecone.Index('pdf-chunks-poc');
+const index = pinecone.Index('pdf-chunks-poc-sa');
 
 // 2) Init OpenAI
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -94,12 +94,12 @@ app.use(express.urlencoded({ extended: true }));
 //   .catch(err => console.error('save failed', err));
 // });
 
-app.post('/chat', async (req, res) => {
+app.post('/chat_sa', async (req, res) => {
   const { regionId, question, session_id } = req.body;
 
   // kick off history save immediately
   const historyPromise = axios.post(
-    'https://x3kb-thkl-gi2q.n7e.xano.io/api:hWPNd5f8/get_history',
+    'https://x3kb-thkl-gi2q.n7e.xano.io/api:cWjxJO0v/get_history_sa',
     { session_id, message: question },
     { headers: { 'Content-Type': 'application/json' } }
   );
@@ -116,7 +116,7 @@ app.post('/chat', async (req, res) => {
     vector: qEmb,
     topK: 5,
     includeMetadata: true,
-    filter: { regionId }, // e.g., "katanga", "kivu", etc.
+    filter: { map:"sa" }, // e.g., "katanga", "kivu", etc.
   });
 
   // NOTE: you wrote 'genric'—use the canonical 'generic'
@@ -139,14 +139,14 @@ app.post('/chat', async (req, res) => {
       sourcePdf = '<unknown source>',
       chunkIndex = '?',
       text = '<no text>',
-      regionId: mdRegionId = 'unknown'
+      map= 'sa'
     } = md;
     return {
       sourcePdf: `${sourcePdf}`,
-      id: `${mdRegionId}:${sourcePdf}`,
+      id: `${map}:${sourcePdf}`,
       score: m?.score ?? 0,
-      regionId: mdRegionId,
-      pretty: `(${mdRegionId} | ${sourcePdf}, chunk #${chunkIndex}):\n${text}`
+      regionId: map,
+      pretty: `(${map} | ${sourcePdf}, chunk #${chunkIndex}):\n${text}`
     };
   };
 
@@ -204,7 +204,7 @@ app.post('/chat', async (req, res) => {
 
   // async logging (no await)
   axios.post(
-    "https://x3kb-thkl-gi2q.n7e.xano.io/api:hWPNd5f8/llm_responses_save",
+    "https://x3kb-thkl-gi2q.n7e.xano.io/api:cWjxJO0v/llm_responses_save_sa",
     {
       prompt: question,
       session_id,
