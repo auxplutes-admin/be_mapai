@@ -176,7 +176,7 @@ app.post('/chat_sa', async (req, res) => {
 
   // Build a STRICT RAG developer message
   const devDirectives = [
-    `You are an expert on regional geology in the Democratic Republic of the Congo. Region focus: ${regionId}.`,
+    `You are an expert on regional geology in the area of South Africa. Region focus: ${regionId}.`,
     `Use the provided CONTEXT snippets as the **primary** source of truth.`,
     `Prefer the CONTEXT; if it does not contain relevant facts to answer, rely on your own knowledge to answer directly.`,
     `Be precise and avoid speculation. If you are uncertain, state the uncertainty briefly.`,
